@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Una Mano en Casa - Gestión</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+:root {
+  --bg:#101c2c; --panel:#1c2b3d; --green:#20a786;
+  --text:#f5f7fa; --muted:#a9b8c8; --line:#304257;
+}
+*{box-sizing:border-box}
+body{margin:0;font-family:Arial,sans-serif;background:var(--bg);color:var(--text)}
+button,input{font:inherit}
+button{cursor:pointer;border:0;border-radius:10px;padding:12px 16px;background:var(--green);color:white;font-weight:bold}
+input{width:100%;padding:13px;border:1px solid var(--line);border-radius:9px;background:#26394d;color:white}
+label{display:block;margin:14px 0 6px;color:var(--muted);font-size:14px}
+#login{max-width:390px;margin:12vh auto;padding:28px;background:var(--panel);border-radius:20px}
+#login h1{font-size:24px}
+#app{display:none;min-height:100vh}
+.sidebar{position:fixed;inset:0 auto 0 0;width:235px;background:var(--panel);padding:25px 16px}
+.brand{font-size:20px;font-weight:bold;margin:5px 8px 35px}
+.brand span{color:#56d6b0}
+.nav button{display:block;width:100%;text-align:left;margin:7px 0;background:transparent;color:var(--muted)}
+.nav button.active,.nav button:hover{background:#26394d;color:white}
+.main{margin-left:235px;padding:32px;max-width:1300px}
+.top{display:flex;justify-content:space-between;align-items:center;gap:15px;margin-bottom:30px}
+.cards{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+.card,.section{background:var(--panel);padding:22px;border-radius:16px;margin-bottom:18px}
+.card small{color:var(--muted)}
+.number{font-size:30px;font-weight:bold;margin-top:12px}
+.section h2{margin-top:0}
+.formgrid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.formgrid .full{grid-column:1/-1}
+table{width:100%;border-collapse:collapse}
+th,td{text-align:left;padding:12px;border-bottom:1px solid var(--line)}
+th{color:var(--muted);font-size:13px}
+.hidden{display:none!important}
+#message{color:#ffcf80;margin-top:12px;font-size:14px}
+.mobile-nav{display:none}
+@media(max-width:700px){
+ .sidebar{display:none}
+ .main{margin:0;padding:20px 15px 90px}
+ .cards{grid-template-columns:1fr 1fr}
+ .formgrid{grid-template-columns:1fr}
+ .formgrid .full{grid-column:auto}
+ .mobile-nav{display:flex;position:fixed;bottom:0;left:0;right:0;background:var(--panel);padding:8px 3px;justify-content:space-around;border-top:1px solid var(--line)}
+ .mobile-nav button{background:transparent;color:var(--muted);padding:9px 5px;font-size:12px}
+}
+</style>
+</head>
+<body>
+
+<div id="login">
+  <h1>🤝 Una Mano en Casa</h1>
+  <p style="color:var(--muted)">Acceso privado a tu gestión</p>
+  <label>Correo electrónico</label>
+  <input id="email" type="email" placeholder="Tu correo">
+  <label>Contraseña</label>
+  <input id="password" type="password" placeholder="Tu contraseña">
+  <button style="width:100%;margin-top:22px" onclick="login()">Iniciar sesión</button>
+  <div id="message"></div>
+</div>
+
+<div id="app">
+  <aside class="sidebar">
+    <div class="brand">🤝 UNA MANO <span>EN CASA</span></div>
+    <div class="nav">
+      <button class="active" onclick="showPage('inicio',this)">⌂ Inicio</button>
+      <button onclick="showPage('clientes',this)">♙ Clientes</button>
+      <button onclick="showPage('agenda',this)">▦ Agenda</button>
+      <button onclick="showPage('packs',this)">▣ Packs</button>
+      <button onclick="showPage('cobros',this)">€ Cobros</button>
+    </div>
+    <button onclick="logout()" style="width:100%;margin-top:30px;background:#34465a">Cerrar sesión</button>
+  </aside>
+
+  <main class="main">
+    <div class="top">
+      <div>
+        <h1 id="pageTitle">Inicio</h1>
+        <div style="color:var(--muted)">Tu negocio, bajo control</div>
+      </div>
+      <div id="userLabel"></div>
+    </div>
+
+    <section id="inicio">
+      <div class="cards">
+        <div class="card"><small>Clientes</small><div class="number" id="totalClientes">0</div></div>
+        <div class="card"><small>Citas</small><div class="number" id="totalCitas">0</div></div>
+        <div class="card"><small>Packs activos</small><div class="number" id="totalPacks">0</div></div>
+      </div>
+      <div class="section" style="margin-top:20px">
+        <h2>Bienvenido a tu negocio</h2>
+        <p style="color:var(--muted)">Desde aquí podrás gestionar clientes, citas, packs y cobros.</p>
+        <button onclick="showPage('clientes')">Ir a clientes</button>
+      </div>
+    </section>
+
+    <section id="clientes" class="hidden">
+      <div class="section">
+        <h2>Nuevo cliente</h2>
+        <div class="formgrid">
+          <div><label>Nombre</label><input id="cNombre" placeholder="Nombre completo"></div>
+          <div><label>Teléfono</label><input id="cTelefono" placeholder="Teléfono"></div>
+          <div class="full"><label>Dirección</label><input id="cDireccion" placeholder="Dirección"></div>
+          <div class="full"><label>Observaciones</label><input id="cObservaciones" placeholder="Notas sobre el cliente"></div>
+        </div>
+        <button style="margin-top:18px" onclick="addClient()">Guardar cliente</button>
+        <div id="clientMessage"></div>
+      </div>
+      <div class="section">
+        <h2>Mis clientes</h2>
+        <div style="overflow-x:auto">
+          <table>
+            <thead><tr><th>Nombre</th><th>Teléfono</th><th>Dirección</th></tr></thead>
+            <tbody id="clientRows"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <section id="agenda" class="hidden">
+      <div class="section">
+        <h2>Agenda</h2>
+        <p style="color:var(--muted)">Aquí incorporaremos el calendario y la creación de citas en el siguiente paso.</p>
+      </div>
+    </section>
+    <section id="packs" class="hidden">
+      <div class="section">
+        <h2>Packs</h2>
+        <p style="color:var(--muted)">Aquí controlaremos las horas contratadas y disponibles.</p>
+      </div>
+    </section>
+    <section id="cobros" class="hidden">
+      <div class="section">
+        <h2>Cobros</h2>
+        <p style="color:var(--muted)">Aquí registraremos pagos e ingresos.</p>
+      </div>
+    </section>
+  </main>
+
+  <nav class="mobile-nav">
+    <button onclick="showPage('inicio')">⌂<br>Inicio</button>
+    <button onclick="showPage('clientes')">♙<br>Clientes</button>
+    <button onclick="showPage('agenda')">▦<br>Agenda</button>
+    <button onclick="showPage('packs')">▣<br>Packs</button>
+    <button onclick="showPage('cobros')">€<br>Cobros</button>
+  </nav>
+</div>
+
+<script>
+const SUPABASE_URL = 'https://uzcarqzixgpetoniqovy.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_4Xj2Xg1SP87rOsnWxhX3rA_GPwgxstO';
+
+const db = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+async function login(){
+  const email=document.getElementById('email').value.trim();
+  const password=document.getElementById('password').value;
+  const msg=document.getElementById('message');
+  msg.textContent='Comprobando acceso...';
+
+  const {error}=await db.auth.signInWithPassword({email,password});
+  if(error){msg.textContent='No se ha podido iniciar sesión: '+error.message;return;}
+  await startApp();
+}
+
+async function startApp(){
+  const {data:{user}}=await db.auth.getUser();
+  if(!user)return;
+
+  const {data:profile,error}=await db.from('Perfiles')
+    .select('"Rol","Nombre"').eq('user_id',user.id).single();
+
+  if(error || profile.Rol!=='administrador'){
+    await db.auth.signOut();
+    document.getElementById('message').textContent='Tu usuario no tiene permisos de administrador.';
+    return;
+  }
+
+  document.getElementById('login').style.display='none';
+  document.getElementById('app').style.display='block';
+  document.getElementById('userLabel').textContent=profile.Nombre||user.email;
+  await loadDashboard();
+  await loadClients();
+}
+
+async function logout(){
+  await db.auth.signOut();
+  location.reload();
+}
+
+function showPage(page,button){
+  ['inicio','clientes','agenda','packs','cobros'].forEach(id=>{
+    document.getElementById(id).classList.toggle('hidden',id!==page);
+  });
+  const names={inicio:'Inicio',clientes:'Clientes',agenda:'Agenda',packs:'Packs',cobros:'Cobros'};
+  document.getElementById('pageTitle').textContent=names[page];
+  document.querySelectorAll('.nav button').forEach(b=>b.classList.remove('active'));
+  if(button)button.classList.add('active');
+  if(page==='clientes')loadClients();
+}
+
+async function loadDashboard(){
+  const tables=['Clientes','Citas','Packs'];
+  const ids=['totalClientes','totalCitas','totalPacks'];
+  for(let i=0;i<tables.length;i++){
+    const {count,error}=await db.from(tables[i]).select('*',{count:'exact',head:true});
+    if(!error)document.getElementById(ids[i]).textContent=count;
+  }
+}
+
+async function loadClients(){
+  const tbody=document.getElementById('clientRows');
+  tbody.innerHTML='<tr><td colspan="3">Cargando...</td></tr>';
+  const {data,error}=await db.from('Clientes')
+    .select('id,Nombre,Teléfono,Dirección')
+    .order('id',{ascending:false});
+
+  if(error){tbody.innerHTML='<tr><td colspan="3">Error: '+error.message+'</td></tr>';return;}
+  tbody.innerHTML='';
+  data.forEach(c=>{
+    const tr=document.createElement('tr');
+    [c.Nombre,c.Teléfono,c.Dirección].forEach(value=>{
+      const td=document.createElement('td');
+      td.textContent=value||'';
+      tr.appendChild(td);
+    });
+    tbody.appendChild(tr);
+  });
+  if(!data.length)tbody.innerHTML='<tr><td colspan="3">Todavía no tienes clientes.</td></tr>';
+}
+
+async function addClient(){
+  const msg=document.getElementById('clientMessage');
+  const Nombre=document.getElementById('cNombre').value.trim();
+  const Teléfono=document.getElementById('cTelefono').value.trim();
+  const Dirección=document.getElementById('cDireccion').value.trim();
+  const Observaciones=document.getElementById('cObservaciones').value.trim();
+
+  if(!Nombre){msg.textContent='Escribe el nombre del cliente.';return;}
+
+  const {error}=await db.from('Clientes').insert({
+    Nombre,Teléfono,Dirección,Observaciones
+  });
+
+  if(error){msg.textContent='Error al guardar: '+error.message;return;}
+
+  msg.textContent='Cliente guardado correctamente.';
+  ['cNombre','cTelefono','cDireccion','cObservaciones'].forEach(id=>{
+    document.getElementById(id).value='';
+  });
+  await loadClients();
+  await loadDashboard();
+}
+
+db.auth.getSession().then(({data})=>{
+  if(data.session)startApp();
+});
+</script>
+</body>
+</html>
