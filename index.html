@@ -3,10 +3,6 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="theme-color" content="#101b25">
-<link rel="manifest" href="./manifest.json">
-<link rel="icon" type="image/png" href="./assets/logo-cuidado.png">
-<link rel="apple-touch-icon" href="./assets/logo-cuidado.png">
 <title>Una Mano en Casa - Gestión</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
@@ -65,7 +61,9 @@ th{color:var(--muted);font-size:13px}
 .button-secondary:hover{background:#d8eae4;box-shadow:none}
 .button-danger{background:#c45d5d;color:#fff}
 .status-pill{display:inline-block;padding:5px 9px;border-radius:20px;background:#eaf1ef;color:#3f5e6b;font-size:12px;white-space:nowrap}
-.appointments-table{min-width:1040px}
+.appointments-table{min-width:1360px}
+.button-link{display:inline-block;padding:9px 12px;border-radius:9px;background:#294453;color:#eaf4f5;text-decoration:none;font-size:13px;font-weight:bold}
+.button-link:hover{background:#345566}
 .appointments-table thead th{position:sticky;top:0;background:#e1ece8;z-index:1;padding-top:15px;padding-bottom:15px}
 .appointments-table tbody tr{transition:background .15s}
 .appointments-table tbody tr:hover td{background:#eaf3f0}
@@ -270,12 +268,23 @@ th{color:#b0c4ca}
 
     <section id="agenda" class="hidden">
       <div class="section">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap"><h2 style="margin:0">Equipo de trabajo</h2><a class="button-link" href="equipo/" target="_blank" rel="noopener noreferrer">Abrir aplicación del equipo ↗</a></div>
+        <p style="color:var(--muted)">Invita primero a la persona desde Supabase → Authentication → Users. Cuando acepte la invitación, registra aquí el mismo correo para poder asignarle citas.</p>
+        <div class="formgrid">
+          <div><label for="teamEmployeeName">Nombre del trabajador</label><input id="teamEmployeeName" placeholder="Nombre"></div>
+          <div><label for="teamEmployeeEmail">Correo de su cuenta Supabase</label><input id="teamEmployeeEmail" type="email" placeholder="trabajador@correo.com"></div>
+        </div>
+        <button type="button" style="margin-top:14px" onclick="registerEmployee()">Añadir al equipo</button>
+        <div id="teamMessage" role="status" aria-live="polite"></div>
+      </div>
+      <div class="section">
         <h2 id="appointmentFormTitle">Nueva cita</h2>
         <input id="appointmentId" type="hidden">
         <input id="appointmentOriginalPackId" type="hidden">
         <input id="appointmentOriginalPackHours" type="hidden">
         <div class="formgrid">
           <div class="full"><label for="aCliente">Cliente</label><select id="aCliente" onchange="loadAppointmentPacks(this.value)"><option value="">Selecciona un cliente</option></select></div>
+          <div class="full"><label for="aEmpleado">Asignar trabajador (opcional)</label><select id="aEmpleado"><option value="">Sin asignar</option></select><small class="field-hint">El trabajador verá este servicio, las instrucciones y el contacto del cliente en su aplicación.</small></div>
         <div class="full"><label for="aPack">Usar pack de 6/12 horas (opcional)</label><select id="aPack" onchange="applyAppointmentPack()"><option value="">No usar pack</option></select><small class="field-hint">Los packs se canjean en bloques de 3 h. Elige en duración cuántas horas consumir en esta cita.</small></div>
           <div><label for="aFecha">Fecha y hora</label><input id="aFecha" type="datetime-local"></div>
           <div><label for="aServicio">Servicio</label><select id="aServicio" onchange="toggleCustomService()"><option value="">Selecciona un servicio</option><option>Acompañamiento</option><option>Recados</option><option>Servicio de compra</option><option value="__otro">Otro servicio</option></select></div>
@@ -293,7 +302,7 @@ th{color:#b0c4ca}
       </div>
       <div class="section">
         <h2>Mis citas</h2>
-        <div style="overflow:auto;max-height:65vh"><table class="appointments-table"><thead><tr><th>Fecha y hora</th><th>Cliente</th><th>Servicio</th><th>Duración</th><th>Pack canjeado</th><th>Precio</th><th>Estado</th><th>Acciones</th></tr></thead><tbody id="appointmentRows"></tbody></table></div>
+        <div style="overflow:auto;max-height:65vh"><table class="appointments-table"><thead><tr><th>Fecha y hora</th><th>Cliente</th><th>Servicio</th><th>Duración</th><th>Pack canjeado</th><th>Precio</th><th>Trabajador</th><th>Estado</th><th>Nota del trabajador</th><th>Acciones</th></tr></thead><tbody id="appointmentRows"></tbody></table></div>
       </div>
     </section>
     <section id="packs" class="hidden">
@@ -313,6 +322,7 @@ th{color:#b0c4ca}
         </div>
         <button id="packSaveButton" style="margin-top:18px" onclick="savePack()">Guardar pack</button>
         <button id="packCancelEdit" class="button-secondary hidden" style="margin-top:18px" onclick="resetPackForm()">Salir de edición</button>
+        <button id="packDeleteButton" class="button-danger hidden" style="margin-top:18px" onclick="deletePack()">Cancelar y borrar pack</button>
         <div id="packMessage" role="status" aria-live="polite"></div>
       </div>
       <div class="cards">
@@ -433,7 +443,7 @@ function showPage(page,button){
   document.querySelectorAll('.nav button').forEach(b=>b.classList.remove('active'));
   (button||document.querySelector('.nav button[data-page="'+page+'"]'))?.classList.add('active');
   if(page==='clientes')loadClients();
-  if(page==='agenda')loadAppointmentClients().then(()=>loadAppointments());
+  if(page==='agenda')loadTeamEmployees().then(()=>loadAppointmentClients()).then(()=>loadAppointments());
   if(page==='packs')loadPackData();
   if(page==='cobros')loadChargeData();
 }
@@ -569,11 +579,30 @@ async function deleteClient(client){
   await loadClients();await loadDashboard();
 }
 
-const appointmentColumnList='id,Cliente_id,Pack_id,Fecha_hora,Servicio,Precio,Estado,"Método de pago",Duracion_horas,Notas';
+const appointmentColumnList='id,Cliente_id,Pack_id,Empleado_user_id,Notas_empleado,Fecha_hora,Servicio,Precio,Estado,"Método de pago",Duracion_horas,Notas';
 let appointmentClients=[];
 let appointmentPacks=[];
+let teamEmployees=[];
 
 function setAppointmentMessage(text){document.getElementById('appointmentMessage').textContent=text;}
+
+async function loadTeamEmployees(){
+  const select=document.getElementById('aEmpleado');if(!select)return;
+  const {data,error}=await db.rpc('admin_listar_empleados');
+  teamEmployees=error?[]:(data||[]);
+  select.innerHTML='';const none=document.createElement('option');none.value='';none.textContent='Sin asignar';select.appendChild(none);
+  teamEmployees.forEach(employee=>{const option=document.createElement('option');option.value=employee.usuario_id;option.textContent=employee.nombre||employee.correo||'Trabajador';select.appendChild(option);});
+  if(error){const message=document.getElementById('teamMessage');if(message)message.textContent='Para activar las asignaciones, ejecuta la migración de equipo en Supabase. Detalle: '+error.message;}
+}
+
+async function registerEmployee(){
+  const name=document.getElementById('teamEmployeeName').value.trim();const email=document.getElementById('teamEmployeeEmail').value.trim();
+  if(!name||!email){document.getElementById('teamMessage').textContent='Completa el nombre y el correo del trabajador.';return;}
+  const {error}=await db.rpc('admin_registrar_empleado',{p_correo:email,p_nombre:name});
+  if(error){document.getElementById('teamMessage').textContent='No se pudo añadir: '+error.message;return;}
+  document.getElementById('teamEmployeeName').value='';document.getElementById('teamEmployeeEmail').value='';
+  document.getElementById('teamMessage').textContent='Trabajador añadido. Ya puedes asignarle citas.';await loadTeamEmployees();
+}
 
 async function loadAppointmentClients(selectedId){
   const select=document.getElementById('aCliente');
@@ -584,6 +613,7 @@ async function loadAppointmentClients(selectedId){
   const placeholder=document.createElement('option');placeholder.value='';placeholder.textContent=appointmentClients.length?'Selecciona un cliente':'Primero crea un cliente';select.appendChild(placeholder);
   appointmentClients.forEach(client=>{const option=document.createElement('option');option.value=client.id;option.textContent=client.Nombre||('Cliente '+client.id);select.appendChild(option);});
   if(selectedId)select.value=String(selectedId);
+  const selectedEmployee=document.getElementById('aEmpleado')?.value||'';const employeeSelect=document.getElementById('aEmpleado');if(employeeSelect&&selectedEmployee)employeeSelect.value=selectedEmployee;
   await loadAppointmentPacks(selectedId);
 }
 
@@ -603,10 +633,10 @@ async function loadAppointmentPacks(selectedClientId,selectedPackId){
 
 async function loadAppointments(){
   const tbody=document.getElementById('appointmentRows');
-  tbody.innerHTML='<tr><td colspan="8">Cargando citas...</td></tr>';
+  tbody.innerHTML='<tr><td colspan="10">Cargando citas...</td></tr>';
   const {data,error}=await db.from('Citas').select(appointmentColumnList).order('Fecha_hora',{ascending:true});
   if(error){tbody.innerHTML='';setAppointmentMessage('No se pudieron cargar las citas: '+error.message);return;}
-  const clientsById=new Map(appointmentClients.map(c=>[String(c.id),c.Nombre]));
+  const clientsById=new Map(appointmentClients.map(c=>[String(c.id),c.Nombre]));const employeesById=new Map(teamEmployees.map(employee=>[String(employee.usuario_id),employee.nombre||employee.correo]));
   tbody.innerHTML='';
   const now=new Date();const activeAppointment=cita=>!['cancelada','completada'].includes(String(cita.Estado||'').toLocaleLowerCase('es-ES'));
   const upcoming=(data||[]).filter(cita=>new Date(cita.Fecha_hora)>=now&&activeAppointment(cita)).sort((a,b)=>new Date(a.Fecha_hora)-new Date(b.Fecha_hora));
@@ -627,8 +657,8 @@ async function loadAppointments(){
     const time=document.createElement('strong');time.className='appointment-time';time.textContent=date.toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'});
     dateTime.append(day,time);dateCell.appendChild(dateTime);tr.appendChild(dateCell);
     const packName=cita.Pack_id?(appointmentPacks.find(pack=>String(pack.id)===String(cita.Pack_id))?.Tipo_pack||'Pack canjeado'):'—';
-    const values=[clientsById.get(String(cita.Cliente_id))||('Cliente '+cita.Cliente_id),cita.Servicio||'',cita.Duracion_horas==null?'':cita.Duracion_horas+' h',packName,cita.Precio==null?'':Number(cita.Precio).toLocaleString('es-ES',{style:'currency',currency:'EUR'}),cita.Estado||''];
-    values.forEach((value,index)=>{const td=document.createElement('td');if(index===5){const state=String(value).toLocaleLowerCase('es-ES');const pill=document.createElement('span');pill.className='status-pill'+(['pendiente','confirmada','completada','cancelada'].includes(state)?' status-'+state:'');pill.textContent=value;td.appendChild(pill);}else if(index===0){const name=document.createElement('span');name.className='appointment-client-name';name.textContent=value;td.appendChild(name);}else if(index===1){const service=document.createElement('span');service.className='appointment-service-name';service.textContent=value;td.appendChild(service);}else td.textContent=value;tr.appendChild(td);});
+    const values=[clientsById.get(String(cita.Cliente_id))||('Cliente '+cita.Cliente_id),cita.Servicio||'',cita.Duracion_horas==null?'':cita.Duracion_horas+' h',packName,cita.Precio==null?'':Number(cita.Precio).toLocaleString('es-ES',{style:'currency',currency:'EUR'}),employeesById.get(String(cita.Empleado_user_id))||'Sin asignar',cita.Estado||'',cita.Notas_empleado||'—'];
+    values.forEach((value,index)=>{const td=document.createElement('td');if(index===6){const state=String(value).toLocaleLowerCase('es-ES');const pill=document.createElement('span');pill.className='status-pill'+(['pendiente','confirmada','completada','cancelada'].includes(state)?' status-'+state:'');pill.textContent=value;td.appendChild(pill);}else if(index===0){const name=document.createElement('span');name.className='appointment-client-name';name.textContent=value;td.appendChild(name);}else if(index===1){const service=document.createElement('span');service.className='appointment-service-name';service.textContent=value;td.appendChild(service);}else td.textContent=value;tr.appendChild(td);});
     const actions=document.createElement('td');actions.className='actions';
     const edit=document.createElement('button');edit.className='button-secondary';edit.textContent='Editar';edit.onclick=()=>editAppointment(cita);
     const profile=document.createElement('button');profile.className='button-secondary';profile.textContent='Ficha cliente';profile.onclick=()=>showClientCard(cita.Cliente_id);
@@ -636,12 +666,12 @@ async function loadAppointments(){
     const remove=document.createElement('button');remove.className='button-danger';remove.textContent='Eliminar';remove.onclick=()=>deleteAppointment(cita);
     actions.append(edit,profile,cancel,remove);tr.appendChild(actions);tbody.appendChild(tr);
   });
-  if(!data||!data.length)tbody.innerHTML='<tr><td colspan="8">Todavía no hay citas.</td></tr>';
+  if(!data||!data.length)tbody.innerHTML='<tr><td colspan="10">Todavía no hay citas.</td></tr>';
   document.getElementById('totalCitas').textContent=(data||[]).length;
 }
 
 function resetAppointmentForm(){
-  ['appointmentId','appointmentOriginalPackId','appointmentOriginalPackHours','aCliente','aPack','aFecha','aServicio','aServicioOtro','aDuracion','aDuracionPersonalizada','aPrecio','aMetodoPago','aNotas'].forEach(id=>document.getElementById(id).value='');
+  ['appointmentId','appointmentOriginalPackId','appointmentOriginalPackHours','aCliente','aEmpleado','aPack','aFecha','aServicio','aServicioOtro','aDuracion','aDuracionPersonalizada','aPrecio','aMetodoPago','aNotas'].forEach(id=>document.getElementById(id).value='');
   document.getElementById('customServiceWrap').classList.add('hidden');
   document.getElementById('customDurationWrap').classList.add('hidden');document.getElementById('aPrecio').readOnly=true;document.getElementById('aDuracion').disabled=false;document.getElementById('appointmentPackHint').classList.add('hidden');document.querySelector('#aDuracion option[value="9"]').hidden=true;Array.from(document.getElementById('aDuracion').options).forEach(option=>option.disabled=false);
   document.getElementById('aEstado').value='Pendiente';
@@ -654,6 +684,7 @@ function editAppointment(cita){
   document.getElementById('appointmentId').value=cita.id;
   const hasReservedPack=Boolean(cita.Pack_id)&&cita.Estado!=='Cancelada';document.getElementById('appointmentOriginalPackId').value=hasReservedPack?cita.Pack_id:'';document.getElementById('appointmentOriginalPackHours').value=hasReservedPack?(cita.Duracion_horas??0):0;
   document.getElementById('aCliente').value=String(cita.Cliente_id);
+  document.getElementById('aEmpleado').value=cita.Empleado_user_id?String(cita.Empleado_user_id):'';
   document.getElementById('aPack').value='';document.getElementById('aDuracion').disabled=false;document.getElementById('appointmentPackHint').classList.add('hidden');
   loadAppointmentPacks(cita.Cliente_id,cita.Pack_id);
   const date=new Date(cita.Fecha_hora);date.setMinutes(date.getMinutes()-date.getTimezoneOffset());
@@ -700,6 +731,7 @@ async function saveAppointment(){
   const metodo=document.getElementById('aMetodoPago').value.trim();
   const Notas=document.getElementById('aNotas').value.trim();
   const Pack_id=document.getElementById('aPack').value;
+  const Empleado_user_id=document.getElementById('aEmpleado').value||null;
   if(!Cliente_id||!localDate||!selectedService||!Servicio||!durationRaw||(!priceRaw&&priceRaw!=='0')){setAppointmentMessage('Completa cliente, fecha, servicio y duración.');return;}
   if(!Number.isFinite(Duracion_horas)||Duracion_horas<=0||!Number.isFinite(Precio)||Precio<0){setAppointmentMessage('La duración debe ser mayor que cero y el precio no puede ser negativo.');return;}
   if(Pack_id&&(![3,6,9,12].includes(Duracion_horas)||Precio!==0)){setAppointmentMessage('Con un pack, elige 3, 6, 9 o 12 horas, según las horas disponibles. El precio es 0 €.');return;}
@@ -715,6 +747,8 @@ async function saveAppointment(){
     return;
   }
   if(!result.data){setAppointmentMessage('No se guardó ningún cambio. Comprueba tus permisos de acceso a citas.');return;}
+  const {error:assignmentError}=await db.rpc('admin_asignar_empleado_cita',{p_cita_id:Number(result.data.id),p_empleado_user_id:Empleado_user_id});
+  if(assignmentError){setAppointmentMessage('La cita se guardó, pero no se pudo guardar la asignación del trabajador: '+assignmentError.message);resetAppointmentForm();await loadAppointments();return;}
   setAppointmentMessage(id?'Cita actualizada.':'Cita guardada correctamente.');
   resetAppointmentForm();
   await loadAppointments();
@@ -902,7 +936,7 @@ function resetPackForm(){
   ['packId','pCliente','pTipo','pTipoPersonalizado','pHorasTotales','pHorasDisponibles','pPrecio','pFechaCaducidad'].forEach(id=>document.getElementById(id).value='');document.getElementById('customPackNameWrap').classList.add('hidden');
   document.getElementById('pEstado').value='Activo';document.getElementById('pFechaCompra').value=localDateField();
   document.getElementById('pFechaCaducidad').readOnly=false;
-  document.getElementById('packFormTitle').textContent='Nuevo pack';document.getElementById('packSaveButton').textContent='Guardar pack';document.getElementById('packCancelEdit').classList.add('hidden');
+  document.getElementById('packFormTitle').textContent='Nuevo pack';document.getElementById('packSaveButton').textContent='Guardar pack';document.getElementById('packCancelEdit').classList.add('hidden');document.getElementById('packDeleteButton').classList.add('hidden');
 }
 
 function editPack(pack){
@@ -913,8 +947,25 @@ function editPack(pack){
   const statusSelect=document.getElementById('pEstado');if(pack.Estado&&!Array.from(statusSelect.options).some(option=>option.value===pack.Estado)){const option=document.createElement('option');option.value=pack.Estado;option.textContent=pack.Estado;statusSelect.appendChild(option);}statusSelect.value=pack.Estado||'Activo';
   document.getElementById('pPrecio').value=pack.Precio_pagado??'';document.getElementById('pFechaCompra').value=pack.Fecha_compra||'';
   const expiryField=document.getElementById('pFechaCaducidad');const preset=packPresets[pack.Tipo_pack];expiryField.readOnly=Boolean(preset?.expiryMonths);expiryField.value=preset?.expiryMonths?addMonthsToDateField(pack.Fecha_compra,preset.expiryMonths):(pack.Fecha_caducidad||'');
-  document.getElementById('packFormTitle').textContent='Editar pack';document.getElementById('packSaveButton').textContent='Guardar cambios';document.getElementById('packCancelEdit').classList.remove('hidden');setPackMessage('');
+  document.getElementById('packFormTitle').textContent='Editar pack';document.getElementById('packSaveButton').textContent='Guardar cambios';document.getElementById('packCancelEdit').classList.remove('hidden');document.getElementById('packDeleteButton').classList.remove('hidden');setPackMessage('');
   document.getElementById('packFormTitle').scrollIntoView({behavior:'smooth',block:'start'});
+}
+
+async function deletePack(){
+  const id=document.getElementById('packId').value;
+  const pack=packRecords.find(item=>String(item.id)===String(id));
+  if(!id||!pack){setPackMessage('No se encontró el pack seleccionado.');return;}
+  const name=pack.Tipo_pack||'este pack';
+  if(!window.confirm(`¿Cancelar y borrar definitivamente el pack «${name}»? Esta acción no se puede deshacer.`))return;
+  const {data,error}=await db.from('Packs').delete().eq('id',Number(id)).select('id').maybeSingle();
+  if(error){
+    const details=String(error.details||'')+' '+String(error.message||'');
+    if(/foreign key|violates.*constraint|still referenced/i.test(details))setPackMessage('No se puede borrar este pack porque está vinculado a citas o cobros. Para conservar el historial, cámbiale el estado a «Anulado».');
+    else setPackMessage('No se pudo borrar el pack: '+error.message);
+    return;
+  }
+  if(!data){setPackMessage('No se borró el pack. Comprueba tus permisos de acceso.');return;}
+  resetPackForm();setPackMessage('Pack cancelado y borrado.');await loadPackData();await loadDashboard();
 }
 
 async function savePack(){
