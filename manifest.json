@@ -1,0 +1,19 @@
+{
+  "id": "./",
+  "name": "UNA MANO EN CASA",
+  "short_name": "Una Mano",
+  "description": "Gestión privada de UNA MANO EN CASA",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#101b25",
+  "theme_color": "#101b25",
+  "icons": [
+    {
+      "src": "./assets/logo-cuidado.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ]
+}
